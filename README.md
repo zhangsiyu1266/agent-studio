@@ -18,6 +18,8 @@ A Windows desktop workbench where GPT plans and reviews, DeepSeek builds, and lo
 
 **[Download Windows portable / 下载 Windows 便携版](https://github.com/zhangsiyu1266/agent-studio/releases/latest)** · **[Start here / 首次使用指南](docs/GETTING-STARTED.md)**
 
+[Check prerequisites before downloading](#prerequisites) · [下载前先看前置条件](#使用前准备)
+
 </div>
 
 ![Agent Studio first-run screen / 首次使用界面](docs/assets/onboarding.png)
@@ -31,6 +33,37 @@ A Windows desktop workbench where GPT plans and reviews, DeepSeek builds, and lo
 **Give the workbench a task. Follow the plan, inspect the changes, and see why the result passed.**
 
 Agent Studio brings model delegation and delivery evidence into one desktop workflow. It works on real files on your computer: GPT owns the plan and final acceptance, DeepSeek handles implementation, and an optional local Qwen model supports read-only analysis. Plans, handoffs, checks, reviews, changes, and outcomes stay available for inspection.
+
+### Prerequisites
+
+**The simplest way to start: Windows 10/11 x64 + a network connection + your own ChatGPT account with Codex access and available usage.** Download the portable ZIP; you do not need to install Node.js, npm, Codex or GitHub CLI separately.
+
+| Requirement | Windows portable ZIP | Run from source |
+|---|---|---|
+| Operating system | Windows 10/11 **x64**; no macOS, Linux or native Windows ARM64 package in this release | Windows is the supported desktop target |
+| ChatGPT account | Required to run tasks: sign in with your own account that can use Codex and has available usage | Same requirement; install Codex CLI and sign in with ChatGPT |
+| Authentication mode | **ChatGPT login only. An OpenAI API key alone does not satisfy this app's GPT authentication requirement.** | Same restriction |
+| Network and browser | Must reach GitHub for downloads and OpenAI/ChatGPT for browser authorization and model requests; local firewall/proxy rules must allow those connections | Also needs access to npm and the Electron download source during `npm ci` |
+| Node.js and npm | Included; no separate installation needed | Install **Node.js 24+ with npm**, then run `npm ci` |
+| Codex CLI | Included; log in using the app's sign-in button | Install a compatible native CLI; **0.160.0** is the version validated for the portable release. See [official CLI setup](https://learn.chatgpt.com/docs/codex/cli) |
+| Local storage and permissions | Fully extract the folder into a writable location and select a project/output directory you can modify. Version 0.2.0 is about **362 MB zipped / 0.98 GB extracted**; leave additional space for extraction, projects and run records | Space for source, installed dependencies, projects and run records; building a portable package also downloads runtime components |
+| Shared accounts or credits | **Not included.** Downloading this MIT-licensed app does not provide model access or free usage | Same |
+
+A ChatGPT account must actually have Codex access; successful sign-in alone does not guarantee every model or request is available. Account/workspace policies, available usage and provider availability still apply. The workbench requires GPT even when optional DeepSeek or Qwen workers are enabled, so it is not a Qwen-only offline application. See [official authentication guidance](https://learn.chatgpt.com/docs/auth).
+
+**Only prepare these tools when you need the corresponding feature:**
+
+| Feature | Additional prerequisites |
+|---|---|
+| Delegate implementation to DeepSeek | Install Claude Code, configure your own DeepSeek access credentials and provider usage, and follow the [official integration guide](https://api-docs.deepseek.com/quick_start/agent_integrations/claude_code/). Keep credentials in your local provider configuration, not in this repository. |
+| Local Qwen analysis | Install [Ollama](https://ollama.com/download/windows), run its service and download the selected model, for example `ollama pull qwen3:8b`. Memory, GPU and disk requirements depend on that model. |
+| Import a public GitHub repository | Install [Git for Windows](https://git-scm.com/downloads/win) and restart the app. A GitHub account is not required for a public clone. |
+| Browse account repositories or import private repositories | Git plus your own GitHub account with repository access, authenticated using the app's GitHub connection. This is separate from ChatGPT login. GitHub CLI is included in the portable ZIP; source users must install it or run `powershell -File scripts/prepare-github.ps1`. |
+| Build or test a particular project | Install that project's required runtime, compiler, browser and dependencies, such as Python or a .NET SDK. Bundled Node.js does not supply every toolchain. |
+
+**First-run checklist:** download the portable asset rather than “Source code” → extract the whole folder → open `Agent Studio.exe` → click **登录 ChatGPT / Sign in** → finish browser authorization and recheck → select a writable project → start a small task. DeepSeek and Qwen are optional; missing workers are explicitly assigned to GPT.
+
+The build is not code-signed and may trigger Windows security or organization-policy prompts. Verify the release checksum and follow your device's approved installation policy. Detailed steps and troubleshooting are in the [first-run guide](docs/GETTING-STARTED.md).
 
 ### Why Agent Studio?
 
@@ -79,7 +112,7 @@ The portable build targets **Windows 10/11 x64**, is not code-signed, and includ
 
 The desktop interface is currently primarily Chinese; the sign-in card and documentation include English guidance.
 
-**Prerequisites**
+**Source setup checklist**
 
 - Windows and Node.js **24 or newer**, with npm.
 - Codex CLI installed and logged in with ChatGPT.
@@ -201,6 +234,37 @@ Read [AGENTS.md](AGENTS.md) and [docs/ENGINEERING.md](docs/ENGINEERING.md) befor
 
 Agent Studio 把模型分工和交付证据放进同一个桌面工作流。它直接处理你电脑上的真实文件：GPT 负责方案与最终验收，DeepSeek 承担实现，可选的本地 Qwen 提供只读分析。计划、交接、检查、审查、变更和成果都有记录可查。
 
+### 使用前准备
+
+**最简单的使用条件：Windows 10/11 x64 电脑 + 可用网络 + 自己具备 Codex 权限和可用额度的 ChatGPT 账号。** 下载便携 ZIP 即可，无需另装 Node.js、npm、Codex 或 GitHub CLI。
+
+| 前置条件 | Windows 便携 ZIP | 从源码运行 |
+|---|---|---|
+| 操作系统 | Windows 10/11 **x64**；本版不提供 macOS、Linux 或 Windows ARM64 原生包 | 当前支持的桌面目标为 Windows |
+| ChatGPT 账号 | 运行任务必须使用自己的账号，并具备 Codex 访问权限和可用额度 | 同样需要；自行安装 Codex CLI 并通过 ChatGPT 登录 |
+| 登录方式 | **仅接受 ChatGPT 登录；只有 OpenAI API key 不能满足本平台的 GPT 认证要求** | 相同限制 |
+| 网络与浏览器 | 下载时能访问 GitHub，登录及推理时能访问 OpenAI/ChatGPT，浏览器授权不能被本地代理或防火墙拦截 | 执行 `npm ci` 时还需能访问 npm 和 Electron 下载源 |
+| Node.js 与 npm | 已随包提供，无需额外安装 | 自行安装 **Node.js 24+ 及 npm**，然后运行 `npm ci` |
+| Codex CLI | 已随包提供，使用应用内登录按钮即可 | 自行安装兼容的原生 CLI；便携版已验证版本为 **0.160.0**，安装方法见[官方说明](https://learn.chatgpt.com/docs/codex/cli) |
+| 磁盘与文件权限 | 完整解压到可写位置，项目或成果目录也需要写入权限；0.2.0 下载包约 **362 MB，解压约 0.98 GB**，还需为解压、项目和执行记录保留额外空间 | 为源码、依赖、项目和执行记录预留空间；自行打包还需下载运行组件 |
+| 共享账号与模型额度 | **不提供。** 应用采用 MIT 许可证，不代表附送模型账号或免费额度 | 相同 |
+
+ChatGPT 账号必须实际具备 Codex 权限，登录成功不代表所有模型或请求都可用；仍受账号、工作区策略、可用额度和服务状态影响。即使启用 DeepSeek 或 Qwen，本平台也始终需要 GPT 规划和验收，不能仅靠本地 Qwen 离线运行。相关认证方式见[官方说明](https://learn.chatgpt.com/docs/auth)。
+
+**以下只在需要对应功能时准备，不是基础使用的必装项：**
+
+| 想使用的功能 | 额外前置条件 |
+|---|---|
+| 让 DeepSeek 承担实现 | 安装 Claude Code，配置自己的 DeepSeek 访问凭据及服务用量，参照[官方集成指南](https://api-docs.deepseek.com/quick_start/agent_integrations/claude_code/)；凭据留在本机模型工具配置中，不要写入仓库 |
+| 使用本地 Qwen 分析 | 安装 [Ollama](https://ollama.com/download/windows)，启动服务并拉取所选模型，例如 `ollama pull qwen3:8b`；内存、显存和磁盘需求取决于所选模型 |
+| 导入 GitHub 公开仓库 | 安装 [Git for Windows](https://git-scm.com/downloads/win) 后重启应用；克隆公开仓库不要求 GitHub 账号 |
+| 浏览账号仓库、导入私有仓库 | 安装 Git，拥有有权访问该仓库的 GitHub 账号，并在应用中单独连接 GitHub；ChatGPT 登录不能代替 GitHub 登录。便携版已含 GitHub CLI，源码用户需自行安装或运行 `powershell -File scripts/prepare-github.ps1` |
+| 构建或测试某个具体项目 | 按该项目需要安装 Python、.NET SDK、编译器、浏览器及依赖；附带 Node.js 不代表包含所有开发工具链 |
+
+**首次运行检查清单：** 下载便携附件而非“Source code” → 完整解压 → 打开 `Agent Studio.exe` → 点击“登录 ChatGPT / Sign in” → 完成浏览器授权并重新检测 → 选择可写项目 → 启动一个小任务。DeepSeek、Qwen 均可稍后配置，缺少辅助模型时明确交给 GPT 执行。
+
+当前构建未签名，可能遇到 Windows 安全提示或单位设备策略限制；请核对发布校验值并遵循设备允许的安装流程。详细操作与排错见[首次使用指南](docs/GETTING-STARTED.md)。
+
 ### 为什么使用 Agent Studio？
 
 - **模型各司其职。** 常规实现交给 DeepSeek，聚焦分析交给本地 Qwen，疑难工作交给 GPT。
@@ -246,7 +310,7 @@ flowchart LR
 
 当前桌面界面以中文为主，入门卡片和使用文档附有英文指引。
 
-**准备环境**
+**源码运行检查清单**
 
 - Windows，Node.js **24 或更新版本**，以及 npm。
 - 已安装 Codex CLI，并使用 ChatGPT 登录。
