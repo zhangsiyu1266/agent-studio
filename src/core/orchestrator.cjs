@@ -94,7 +94,7 @@ class Orchestrator {
   async call(run, providers, provider, options) {
     this.checkAbort(options.signal);
     const protocol = options.schema === planSchema
-      ? `调度约定：projectPath 必须填写当前工作与成果目录 ${run.projectPath}，referencePaths 列出你实际定位并核实的参考文件或源码目录的绝对路径。两者可以不同；例如从 C 盘的软件源码取材，在用户选择的 E 盘目录编写 README，是可执行任务，必须 ready，不得仅因参考源码位于外部而 blocked。当前目录只有快捷方式时先自行解析目标、查找真实源码。只有确实无法找到必要资料、访问失败或必要写入超出当前目录时才 blocked，并给出具体证据。可执行时 status=ready、blockedReason 为空。evidence 用简短的“绝对路径：已核实事实”共享规划证据；文件读取属于工作所需的工具调用，不要拆成无益的重复调研任务。checks 默认在成果目录执行，文档任务检查实际文档和事实，不要在没有 package.json 的输出目录机械运行 npm test；需要外部项目的检查时在参数中明确目标。简单文档修改或单个模块修复默认只设一个 DeepSeek 实现任务；有独立、明确收益时才增设 Qwen 或 GPT 工作任务，不要求每个模型都参与。复杂工作仍按实际接口和依赖充分拆分。qwenThinking 对提取、分类、整理设 false，确需复杂推理的 Qwen 任务设 true，其他执行者设 false。GPT 的最终代码核查、测试与验收保持完整。\n本机搜索起点（不是读取范围限制）：${run.fileAccess?.searchContext || ''}`
+      ? `调度约定：projectPath 必须填写当前工作与成果目录 ${run.projectPath}，referencePaths 列出你实际定位并核实的参考文件或源码目录的绝对路径。两者可以不同；例如从 C 盘的软件源码取材，在用户选择的 E 盘目录编写 README，是可执行任务，必须 ready，不得仅因参考源码位于外部而 blocked。当前目录只有快捷方式时先自行解析目标、查找真实源码。只有确实无法找到必要资料、访问失败或必要写入超出当前目录时才 blocked，并给出具体证据。可执行时 status=ready、blockedReason 为空。evidence 用简短的“绝对路径：已核实事实”共享规划证据；文件读取属于工作所需的工具调用，不要拆成无益的重复调研任务。checks 默认在成果目录执行，文档任务检查实际文档和事实，不要在没有 package.json 的输出目录机械运行 npm test；需要外部项目的检查时在参数中明确目标。只能分配给可用的模型；DeepSeek 未配置时由 GPT 实现，Qwen 未配置时无需增加辅助任务。简单文档修改或单个模块修复在 DeepSeek 可用时默认只设一个 DeepSeek 实现任务；有独立、明确收益时才增设 Qwen 或 GPT 工作任务，不要求每个模型都参与。复杂工作仍按实际接口和依赖充分拆分。qwenThinking 对提取、分类、整理设 false，确需复杂推理的 Qwen 任务设 true，其他执行者设 false。GPT 的最终代码核查、测试与验收保持完整。\n本机搜索起点（不是读取范围限制）：${run.fileAccess?.searchContext || ''}`
       : options.schema === workerSchema
         ? `交接约定：projectPath 填写当前工作与成果目录 ${run.projectPath}，不是外部参考源码目录。可以自主读取 referencePaths 及其他任务相关文件，不因跨目录取材而 blocked。必须返回给定 JSON：status 为 completed/blocked/failed；summary 写实际产出；changedFiles 写成果目录内实际修改的相对路径；checks 写实际检查与结果；blockers 写阻塞原因。确实缺少必要资料、读取失败、未满足前置条件时返回 blocked，不得称 completed。只有全部任务验收条件满足且 blockers 为空才能 completed。Qwen 没有工具，不要声称读取了未提供的文件；只读分析的 changedFiles 为空。已核实的规划证据（仍需核对发生变化的原文件）：${JSON.stringify(run.plan?.evidence || []).slice(0, 16000)}`
         : '';
@@ -169,15 +169,18 @@ class Orchestrator {
     if ((await validateProjectDirectory(run.projectPath)).shortcutOnly) {
       this.log(run, '当前目录只有快捷方式，将由 GPT 只读解析目标并定位参考源码；成果仍保存在当前目录。');
     }
-    const capabilityText = JSON.stringify({
+    run.availableProviders = {
+      gpt: true,
       deepseek: connections.deepseek.available && connections.deepseek.configured,
       qwen: connections.ollama.available && connections.ollama.models.some((item) => (typeof item === 'string' ? item : item.name || item.model) === settings.qwenModel),
-    });
+    };
+    const capabilityText = JSON.stringify(run.availableProviders);
     const planResult = await this.call(run, providers, 'gpt', {
       cwd: run.projectPath, signal, writable: false, schema: planSchema,
       prompt: `你是本项目的技术负责人和最终质量负责人。你必须亲自统筹、规划、分配工作，最终由你审查修改。\n${STANDARDS}\n用户需求：\n${run.request}${attachmentContext(run.attachments)}\n可用执行者：${capabilityText}；GPT始终可用。\n项目上下文：\n${context}\n请检查原文件后制定明确的软件实现方案，用给定JSON结构输出。将常规实现分配给deepseek，将只需分析、整理证据或给建议的辅助任务分配给qwen；复杂实现可分配给gpt。平台会在全部tasks执行后运行专用GPT最终审查，不要将最终审查再次列为tasks，避免重复审查。Qwen在首版没有写文件和执行命令的工具，禁止给它直接修改代码或运行测试的任务。每个任务包含文件范围、依赖和可验证的验收标准。不要把需求简化成演示或占位代码。检查命令使用程序名+参数数组，不要用shell复合字符串。任务依赖必须完整且无环；按依赖排序。至少一项最终验收标准。当前阶段只读，不改文件。`,
     });
     run.plan = validatePlan(parseStructured(planResult));
+    this.routeAvailableTasks(run, run.plan.tasks);
     run.title = run.plan.title;
     run.tasks = run.plan.tasks.map((task) => ({ ...task, status: 'pending', result: null }));
     await fs.writeFile(path.join(artifactDirectory, 'plan.json'), JSON.stringify(run.plan, null, 2));
@@ -245,6 +248,7 @@ class Orchestrator {
       if (run.review.repairTasks.length) {
         this.phase(run, 'repairing', '按 GPT 审查意见修复');
         const repairs = run.review.repairTasks.map((task) => ({ ...task, status: 'pending', result: null }));
+        this.routeAvailableTasks(run, repairs);
         run.tasks.push(...repairs);
         if (!await this.executeTasks(run, providers, repairs, signal, artifactDirectory)) {
           await this.captureChanges(run, baseline, artifactDirectory, signal);
@@ -257,6 +261,18 @@ class Orchestrator {
     this.phase(run, 'needs_attention', '尚未达到 GPT 验收标准，需要继续处理');
     run.error = '已达到本次审查轮数上限，未标记为完成。可增加轮数后基于当前代码重新执行。';
     this.publish(run);
+  }
+
+  routeAvailableTasks(run, tasks) {
+    for (const task of tasks) {
+      if (run.availableProviders[task.provider]) continue;
+      const requestedProvider = task.provider;
+      task.provider = 'gpt';
+      task.requestedProvider = requestedProvider;
+      task.readOnly = requestedProvider === 'qwen';
+      task.instructions += task.readOnly ? '\n此任务转由 GPT 执行，只读核查，禁止修改文件。' : '\n此任务转由 GPT 实际实现并验证。';
+      this.log(run, `${requestedProvider} 未配置或不可用；任务“${task.title}”明确改由 GPT 执行。`, 'system');
+    }
   }
 
   async executeTasks(run, providers, tasks, signal, artifactDirectory) {
@@ -278,7 +294,7 @@ class Orchestrator {
       const prior = run.tasks.filter((item) => task.dependencies.includes(item.id)).map((item) => ({ id: item.id, result: item.result }));
       try {
         const result = await this.call(run, providers, task.provider, {
-          cwd: run.projectPath, signal, writable: task.provider !== 'qwen', schema: workerSchema, thinking: task.qwenThinking === true,
+          cwd: run.projectPath, signal, writable: task.provider !== 'qwen' && !task.readOnly, schema: workerSchema, thinking: task.qwenThinking === true,
           prompt: `你是 GPT 技术负责人分配的执行者。\n${STANDARDS}\n原始用户需求：\n${run.request}${attachmentContext(run.attachments)}\n整体目标：${run.plan.summary}\n本任务：${JSON.stringify(task)}\n依赖交接：${JSON.stringify(prior).slice(0, 25000)}\n相关上下文：\n${context}\n${task.provider === 'qwen' ? '你仅能分析提供的上下文，不能执行命令或实际修改文件。返回有原文件路径依据的分析、建议和未验证事项。不得声称已经运行测试或完成代码修改。' : '实现本任务，仅修改约定范围的文件。遇到范围外需要修改时报告原因，不擅自扩大范围。可以运行所需检查。不要提交或发布，除非本任务用户需求明确要求。完成后简洁返回实际修改文件、运行检查及结果、未解决问题。'}`,
         });
         const outcome = validateWorker(parseStructured(result));

@@ -8,6 +8,7 @@ const os = require('os');
 const path = require('path');
 const readline = require('readline');
 const { runProcess, killProcessTree } = require('./process.cjs');
+const { bundledCodex } = require('./runtime.cjs');
 
 const DEFAULT_OLLAMA_URL = 'http://127.0.0.1:11434';
 
@@ -86,6 +87,10 @@ function codexVendorCandidates() {
 function resolveCodexExecutable(settings = {}) {
   if (settings.codexCommand && settings.codexCommand.trim()) {
     return settings.codexCommand.trim();
+  }
+
+  for (const candidate of [bundledCodex(), path.join(localAppDataRoot(), 'Programs', 'OpenAI', 'Codex', 'bin', 'codex.exe'), path.join(os.homedir(), '.local', 'bin', 'codex.exe')]) {
+    if (isFile(candidate)) return candidate;
   }
 
   for (const candidate of codexVendorCandidates()) {

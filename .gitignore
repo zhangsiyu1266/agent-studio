@@ -5,6 +5,9 @@ dist/
 *.log
 coverage/
 tools/github/
+tools/codex/
+tools/node/
+tools/runtime-manifest.json
 
 # Local credentials and machine-specific provider configuration.
 .env

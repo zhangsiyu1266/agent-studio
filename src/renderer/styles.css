@@ -27,6 +27,15 @@
   --sidebar-width: 238px;
 }
 
+.setup-card { border-color: var(--mint-line); margin-bottom: 16px; }
+.setup-body { display: grid; gap: 10px; }
+.setup-body p { margin: 0; }
+.setup-status { color: var(--text); font-size: 13px; }
+.setup-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.setup-feedback { color: var(--amber); overflow-wrap: anywhere; }
+.setup-optional summary { color: var(--text-muted); cursor: pointer; font-size: 12px; }
+.setup-optional[open] { display: grid; gap: 10px; }
+
 * {
   box-sizing: border-box;
 }

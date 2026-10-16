@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { Store } = require('../src/core/store.cjs');
 const { Orchestrator } = require('../src/core/orchestrator.cjs');
+const { workerSchema } = require('../src/core/contracts.cjs');
 
 const plan = {
   title: 'Test application', summary: 'Build one module', acceptance: ['Exact behavior passes'],
@@ -24,8 +25,15 @@ async function fixture(t, options = {}) {
   const store = new Store(path.join(root, 'data'), { maxReviewRounds: 2, qwenModel: 'qwen3:8b' });
   const calls = [];
   const connections = { codex: { available: true, authenticated: true, authMode: options.authMode || 'chatgpt' }, deepseek: { available: true, configured: true }, ollama: { available: false, models: [] } };
+  if (options.gptOnly) connections.deepseek = { available: false, configured: false };
   const codex = { run: async (input) => {
     if (options.onPrompt) options.onPrompt(input.prompt);
+    if (input.schema === workerSchema) {
+      calls.push('gpt-worker');
+      if (input.writable) await fs.writeFile(path.join(project, 'result.txt'), 'implemented by GPT');
+      const outcome = input.writable ? completedWorker(project) : { ...completedWorker(project), changedFiles: [], summary: 'Read-only analysis' };
+      return { structured: outcome, text: 'GPT worker fixture', usage: { inputTokens: 8, outputTokens: 3 } };
+    }
     calls.push(input.writable ? 'review' : 'plan');
     return { structured: input.writable ? structuredClone(options.review || approved) : { ...plan, status: 'ready', projectPath: project, blockedReason: '', evidence: [], ...options.plan }, text: 'GPT evidence', usage: { inputTokens: 10, outputTokens: 4, cachedTokens: 5 } };
   } };
@@ -268,4 +276,40 @@ test('successful checks that change reviewed code invalidate GPT approval', asyn
   assert.equal(run.status, 'needs_attention');
   assert.equal(calls.filter((item) => item === 'review').length, 2);
   assert.equal(run.review.approved, false);
+});
+
+test('GPT-only mode actually executes and reviews work without optional providers', async (t) => {
+  const { engine, project, calls } = await fixture(t, { gptOnly: true });
+  const run = await engine.start({ projectPath: project, request: 'Implement with GPT only' });
+  await engine.pending;
+  assert.equal(run.status, 'completed');
+  assert.deepEqual(calls, ['plan', 'gpt-worker', 'review']);
+  assert.equal(run.tasks[0].provider, 'gpt');
+  assert.equal(run.tasks[0].requestedProvider, 'deepseek');
+  assert.equal(run.usage.deepseek.inputTokens, 0);
+  assert.equal(run.usage.gpt.inputTokens, 28);
+  assert.match(await fs.readFile(path.join(project, 'result.txt'), 'utf8'), /GPT/);
+  assert.ok(run.events.some((event) => event.message.includes('明确改由 GPT')));
+});
+
+test('a configured worker failure stays visible and is not silently replaced by GPT', async (t) => {
+  const { engine, project, calls } = await fixture(t, { worker: async () => { throw new Error('Provider unavailable during inference'); } });
+  const run = await engine.start({ projectPath: project, request: 'Keep real provider errors visible' });
+  await engine.pending;
+  assert.equal(run.tasks[0].provider, 'deepseek');
+  assert.equal(calls.includes('gpt-worker'), false);
+  assert.match(run.tasks[0].result, /Provider unavailable during inference/);
+});
+
+test('unavailable Qwen tasks keep read-only intent when explicitly assigned to GPT', async (t) => {
+  const tasks = [{ ...plan.tasks[0], provider: 'qwen', instructions: 'Analyze supplied text without edits' }];
+  const { engine, project } = await fixture(t, { gptOnly: true, plan: { tasks } });
+  const run = await engine.start({ projectPath: project, request: 'Read-only support without Qwen' });
+  await engine.pending;
+  assert.equal(run.status, 'completed');
+  assert.equal(run.tasks[0].provider, 'gpt');
+  assert.equal(run.tasks[0].requestedProvider, 'qwen');
+  assert.equal(run.tasks[0].readOnly, true);
+  assert.deepEqual(await fs.readdir(project), []);
+  assert.equal(run.usage.qwen.inputTokens, 0);
 });

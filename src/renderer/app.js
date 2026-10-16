@@ -309,6 +309,7 @@
       if (!state) return;
       app.settings = state.settings || DEFAULT_SETTINGS;
       app.connections = state.connections || null;
+      window.setupGuide.setOperation(state.setupOperation || null);
       app.runs = Array.isArray(state.runs) ? state.runs.slice() : [];
       app.activeRunId = state.activeRunId || null;
       if (state.projects) applyProjects(state.projects);
@@ -344,6 +345,11 @@
       window.studio.onEvent((event) => {
         try {
           if (!event) return;
+          if (event.type === 'setup.updated') {
+            window.setupGuide.setOperation(event.operation);
+            renderSetup();
+            return;
+          }
           if (event.type === 'github.operation') {
             window.projectPicker.operation(event.operation);
             return;
@@ -416,7 +422,12 @@
     actions.appendChild(refresh);
   }
 
+  function renderSetup() {
+    window.setupGuide.render(app.connections, Boolean(activeRun()), probeAction);
+  }
+
   function updateRunningUi() {
+    renderSetup();
     const active = activeRun();
     const startBtn = $('start-run');
     if (startBtn) {
@@ -465,6 +476,10 @@
     const right = el('div', 'section-stack');
     grid.appendChild(left);
     grid.appendChild(right);
+
+    const setupCard = el('section', 'card setup-card');
+    setupCard.id = 'workbench-setup';
+    left.appendChild(setupCard);
 
     const projectCard = el('section', 'card');
     const projectHeader = el('div', 'card-header');
@@ -1701,6 +1716,9 @@
   function buildConnectionsView() {
     const view = $('view-connections');
     clear(view);
+    const setupCard = el('section', 'card setup-card');
+    setupCard.id = 'connections-setup';
+    view.appendChild(setupCard);
     const grid = el('div', 'connections-grid');
 
     const settingsCard = el('section', 'card');

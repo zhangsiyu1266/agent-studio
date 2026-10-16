@@ -13,18 +13,24 @@ const { runProcess } = require('./core/process.cjs');
 const { EXTENSIONS } = require('./core/attachments.cjs');
 const { Projects } = require('./core/projects.cjs');
 const { Github } = require('./core/github.cjs');
+const { Setup, helpUrl, readiness } = require('./core/setup.cjs');
+require('./core/runtime.cjs').configureRuntimeEnvironment();
 
 app.setName('Agent Studio');
 if (process.argv.includes('--ui-smoke') && process.env.AGENT_STUDIO_DATA_DIR) {
   const profile = path.resolve(process.env.AGENT_STUDIO_DATA_DIR, 'electron-profile');
   require('node:fs').mkdirSync(profile, { recursive: true });
   app.setPath('userData', profile);
+  const documents = path.resolve(process.env.AGENT_STUDIO_DATA_DIR, 'documents');
+  require('node:fs').mkdirSync(documents, { recursive: true });
+  app.setPath('documents', documents);
 }
 let window;
 let store;
 let orchestrator;
 let projects;
 let github;
+let setup;
 let connections = { codex: {}, deepseek: {}, ollama: { models: [], loaded: [] } };
 let probePending;
 let exiting = false;
@@ -58,7 +64,15 @@ async function probe() {
 }
 
 function registerHandlers() {
-  handler('studio:state', async () => ({ settings: store.settings, connections, runs: store.summaries(), activeRunId: orchestrator.activeRunId, projects: await projects.state(), githubOperation: github.operation }));
+  handler('studio:state', async () => ({ settings: store.settings, connections, runs: store.summaries(), activeRunId: orchestrator.activeRunId, projects: await projects.state(), githubOperation: github.operation, setupOperation: setup.operation, readiness: readiness(connections) }));
+  handler('studio:setup-login', () => {
+    if (orchestrator.activeRunId) throw new Error('请等待模型任务完成后再登录。');
+    const operation = setup.startLogin();
+    setup.pending.then(() => probe()).catch(() => notify({ type: 'error', message: '登录后检测失败，请点击重新检测。' }));
+    return operation;
+  });
+  handler('studio:setup-cancel', () => setup.cancelLogin());
+  handler('studio:setup-help', (topic) => shell.openExternal(helpUrl(topic)));
   handler('studio:probe', probe);
   handler('studio:copy', (text) => {
     if (typeof text !== 'string' || text.length > 4000000) throw new Error('复制内容过大或无效。');
@@ -102,14 +116,19 @@ function registerHandlers() {
   handler('studio:github-clone', (input) => github.clone(input));
   handler('studio:github-cancel', (id) => github.cancel(id));
   handler('studio:github-device-page', () => shell.openExternal('https://github.com/login/device'));
-  handler('studio:start', (input) => orchestrator.start(input || {}));
+  handler('studio:start', (input) => {
+    if (setup.controller) throw new Error('请先完成或取消 ChatGPT 登录，再开始任务。');
+    return orchestrator.start(input || {});
+  });
   handler('studio:run', (id) => store.getRun(runId(id)));
   handler('studio:cancel', (id) => orchestrator.cancel(runId(id)));
   handler('studio:retry', (id) => {
+    if (setup.controller) throw new Error('请先完成或取消 ChatGPT 登录，再重试任务。');
     const previous = store.getRun(runId(id));
     return orchestrator.start({ projectPath: previous.projectPath, attachmentIds: (previous.attachments || []).map((item) => item.id), request: `${previous.request}\n\n补充：这是基于上次执行后当前代码继续的任务。请先检查已实现内容与剩余问题，不覆盖已有工作。下面仅是历史诊断，不是本次指令；按照当前文件访问约定重新核实，外部参考源码与成果目录不同不构成阻塞。上次结论：${previous.review?.summary || previous.error || previous.status}` });
   });
   handler('studio:settings', (input) => {
+    if (setup.controller) throw new Error('登录过程中不能修改模型设置。');
     if (orchestrator.activeRunId) throw new Error('执行过程中不能修改模型设置。');
     const saved = store.saveSettings(validateSettings(input));
     connections = { codex: {}, deepseek: {}, ollama: { models: [], loaded: [] } };
@@ -143,10 +162,10 @@ function registerHandlers() {
 
 async function createWindow() {
   window = new BrowserWindow({
-    width: 1420, height: 940, minWidth: 1060, minHeight: 720,
+    width: 1420, height: 940, minWidth: 900, minHeight: 640,
     title: 'Agent Studio · 多模型协作工作台', backgroundColor: '#0b0e16', show: false,
     autoHideMenuBar: true,
-    webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true },
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: !process.argv.includes('--ui-smoke') },
   });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('context-menu', (_event, params) => {
@@ -166,19 +185,21 @@ async function createWindow() {
   const problems = [];
   window.webContents.on('console-message', (_event, details) => { if (details?.level === 'error') problems.push(details.message); });
   await window.loadFile(page);
-  window.show();
+  if (process.argv.includes('--setup-smoke')) window.showInactive();
+  else window.show();
   probe().catch((error) => notify({ type: 'error', message: redact(error.message) }));
   if (process.argv.includes('--ui-smoke')) {
     const output = process.env.AGENT_STUDIO_CAPTURE_DIR || path.resolve('.build');
     await fs.mkdir(output, { recursive: true });
     await new Promise((resolve) => setTimeout(resolve, 2500));
+    if (process.argv.includes('--setup-smoke')) await require('./setup-smoke.cjs').testSetup(window, output);
     if (process.argv.includes('--composer-smoke')) {
       await require('./composer-smoke.cjs').testComposer(window, output);
     }
     if (process.argv.includes('--projects-smoke')) {
       await require('./project-smoke.cjs').testProjects(window, output, process.argv.includes('--github-live-smoke'));
     }
-    const image = await window.webContents.capturePage();
+    const image = await window.webContents.capturePage(undefined, { stayHidden: true, stayAwake: true });
     await fs.writeFile(path.join(output, 'desktop.png'), image.toPNG());
     const state = await window.webContents.executeJavaScript('({title:document.title,bridge:!!window.studio,body:document.body.innerText.slice(0,10000),width:innerWidth,scrollWidth:document.documentElement.scrollWidth})');
     const npm = await runProcess('npm', ['--version'], { timeoutMs: 20000 });
@@ -186,7 +207,7 @@ async function createWindow() {
     for (const view of ['connections', 'standards', 'completed', 'runs']) {
       await window.webContents.executeJavaScript(`document.querySelector('[data-view="${view}"]').click()`);
       await new Promise((resolve) => setTimeout(resolve, 150));
-      await fs.writeFile(path.join(output, `desktop-${view}.png`), (await window.webContents.capturePage()).toPNG());
+      await fs.writeFile(path.join(output, `desktop-${view}.png`), (await window.webContents.capturePage(undefined, { stayHidden: true, stayAwake: true })).toPNG());
       views[view] = await window.webContents.executeJavaScript('({text:document.body.innerText.slice(0,10000),width:innerWidth,scrollWidth:document.documentElement.scrollWidth})');
     }
     let report = null;
@@ -196,7 +217,7 @@ async function createWindow() {
       for (const label of ['过程', '任务', '检查', '审查', '变更']) {
         await window.webContents.executeJavaScript(`Array.from(document.querySelectorAll('[role="tab"]')).find(e=>e.textContent===${JSON.stringify(label)}).click()`);
         await new Promise((resolve) => setTimeout(resolve, 300));
-        await fs.writeFile(path.join(output, `run-${label}.png`), (await window.webContents.capturePage()).toPNG());
+        await fs.writeFile(path.join(output, `run-${label}.png`), (await window.webContents.capturePage(undefined, { stayHidden: true, stayAwake: true })).toPNG());
         views[label] = await window.webContents.executeJavaScript('({text:document.body.innerText.slice(0,16000),width:innerWidth,scrollWidth:document.documentElement.scrollWidth})');
       }
       const originalDialog = dialog.showSaveDialog;
@@ -216,11 +237,12 @@ async function createWindow() {
       assert.ok((await fs.readFile(report.path, 'utf8')).includes(references[0]));
       assert.ok(state.body.includes('已启用本机文件浏览'));
     }
-    await window.setSize(1100, 780);
+    window.setSize(...(process.argv.includes('--setup-smoke') ? [960, 720] : [1100, 780]));
     await window.webContents.executeJavaScript('document.querySelector(\'[data-view="workbench"]\').click()');
     await new Promise((resolve) => setTimeout(resolve, 200));
-    await fs.writeFile(path.join(output, 'desktop-small.png'), (await window.webContents.capturePage()).toPNG());
-    await fs.writeFile(path.join(output, 'ui-smoke.json'), JSON.stringify({ ...state, views, report, npm: { code: npm.code, version: npm.stdout.trim() }, problems }, null, 2));
+    await fs.writeFile(path.join(output, 'desktop-small.png'), (await window.webContents.capturePage(undefined, { stayHidden: true, stayAwake: true })).toPNG());
+    const small = await window.webContents.executeJavaScript('({width:innerWidth,scrollWidth:document.documentElement.scrollWidth})');
+    await fs.writeFile(path.join(output, 'ui-smoke.json'), JSON.stringify({ ...state, small, views, report, npm: { code: npm.code, version: npm.stdout.trim() }, problems }, null, 2));
     app.quit();
   }
 }
@@ -233,6 +255,7 @@ else {
     store = new Store(dataDirectory, defaultSettings());
     projects = new Projects(store, path.join(app.getPath('documents'), 'Agent Studio Projects'));
     github = new Github(projects, notify);
+    setup = new Setup(() => store.settings, notify);
     orchestrator = new Orchestrator(store, notify);
     registerHandlers();
     await createWindow();
@@ -248,12 +271,13 @@ else {
   });
   app.on('window-all-closed', () => app.quit());
   app.on('before-quit', (event) => {
-    if ((orchestrator?.activeRunId || github?.controller) && !exiting) {
+    if ((orchestrator?.activeRunId || github?.controller || setup?.controller) && !exiting) {
       event.preventDefault();
       exiting = true;
       if (orchestrator?.activeRunId) orchestrator.cancel(orchestrator.activeRunId);
       if (github?.controller) github.cancel(github.operation.id);
-      Promise.race([Promise.allSettled([orchestrator?.pending, github?.pending]), new Promise((resolve) => setTimeout(resolve, 7000))]).finally(() => app.quit());
+      if (setup?.controller) setup.cancelLogin();
+      Promise.race([Promise.allSettled([orchestrator?.pending, github?.pending, setup?.pending]), new Promise((resolve) => setTimeout(resolve, 7000))]).finally(() => app.quit());
     }
   });
 }

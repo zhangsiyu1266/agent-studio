@@ -16,7 +16,13 @@ A Windows desktop workbench where GPT plans and reviews, DeepSeek builds, and lo
 
 [English](#english) · [简体中文](#简体中文) · [Quick start / 快速开始](#quick-start) · [Engineering / 工程约定](docs/ENGINEERING.md)
 
+**[Download Windows portable / 下载 Windows 便携版](https://github.com/zhangsiyu1266/agent-studio/releases/latest)** · **[Start here / 首次使用指南](docs/GETTING-STARTED.md)**
+
 </div>
+
+![Agent Studio first-run screen / 首次使用界面](docs/assets/onboarding.png)
+
+*Actual desktop interface in an isolated profile; no model execution has started. / 隔离配置下的真实桌面界面，尚未启动模型执行。*
 
 ---
 
@@ -65,17 +71,27 @@ Version 1 runs one request at a time and executes worker tasks sequentially. GPT
 
 ### Quick start
 
+**For desktop users:** download `Agent-Studio-0.2.0-win-x64.zip` from [Releases](https://github.com/zhangsiyu1266/agent-studio/releases/latest), fully extract it, and open **Agent Studio.exe**. Node.js/npm, Codex and GitHub CLI are included. Click **登录 ChatGPT / Sign in** and authorize your own account in the browser. Without optional workers, GPT handles planning, implementation and final review. See the [first-run guide](docs/GETTING-STARTED.md).
+
+The portable build targets **Windows 10/11 x64**, is not code-signed, and includes no shared account or model credits. Project-specific tools such as Git, Python and compilers may still be required.
+
+**For source contributors:**
+
+The desktop interface is currently primarily Chinese; the sign-in card and documentation include English guidance.
+
 **Prerequisites**
 
 - Windows and Node.js **24 or newer**, with npm.
 - Codex CLI installed and logged in with ChatGPT.
-- Claude Code installed and configured to use DeepSeek for delegated implementation.
+- Optional: Claude Code configured to use DeepSeek for delegated implementation. GPT can implement tasks without it.
 - Optional: Ollama with a local Qwen model for read-only support.
 - Git for repository imports; GitHub CLI for GitHub account login and private-repository access.
 
 From the project directory:
 
 ```powershell
+git clone https://github.com/zhangsiyu1266/agent-studio.git
+cd agent-studio
 npm ci
 npm start
 ```
@@ -156,10 +172,13 @@ To build the Windows portable folder:
 
 ```powershell
 powershell -File scripts/prepare-github.ps1
+powershell -File scripts/prepare-runtime.ps1
 npm run package
+npm run release:smoke
+npm run release:archive
 ```
 
-The preparation script downloads pinned GitHub CLI **2.102.0** and verifies its published SHA-256. The package includes the CLI and its license. Launch `dist/Agent-Studio/Agent Studio.exe` and keep the entire `Agent-Studio` folder together. Generated dependencies, acceptance data and portable builds are excluded from the source repository.
+The preparation scripts verify GitHub CLI **2.102.0** against its SHA-256, Node.js **24.21.0** against the official checksum, and Codex **0.160.0** against npm SHA-512 integrity. Their licenses and upstream resources are preserved. Packaging creates a new `dist/Agent-Studio-0.2.0-win-x64` folder; an existing folder is never silently reused. Clean-profile smoke checks hide host tool installations and credentials, and do not start OAuth or model inference. The archive command produces a ZIP and `SHA256SUMS.txt`. Generated dependencies, acceptance data and builds are excluded from the source repository.
 
 | Directory | Purpose |
 |---|---|
@@ -172,7 +191,7 @@ The preparation script downloads pinned GitHub CLI **2.102.0** and verifies its 
 
 Read [AGENTS.md](AGENTS.md) and [docs/ENGINEERING.md](docs/ENGINEERING.md) before contributing. Bug reports are most useful with reproduction steps and redacted errors; never include credentials or private source you do not intend to share.
 
-**License:** No project license has been declared yet. Public repository visibility does not grant an open-source license. Bundled third-party components retain their own licenses.
+**License:** [MIT](LICENSE). Bundled third-party components retain their own licenses; see [third-party notices](THIRD-PARTY-NOTICES.md).
 
 ---
 
@@ -219,17 +238,27 @@ flowchart LR
 
 ### 快速开始
 
+**桌面用户：** 在 [Releases](https://github.com/zhangsiyu1266/agent-studio/releases/latest) 下载 `Agent-Studio-0.2.0-win-x64.zip`，完整解压后双击 **Agent Studio.exe**。便携版已附带 Node.js/npm、Codex 和 GitHub CLI；点击 **登录 ChatGPT / Sign in**，在浏览器中登录自己的账号。未配置辅助模型时，GPT 负责规划、实现和最终审查。详见[首次使用指南](docs/GETTING-STARTED.md)。
+
+便携版面向 **Windows 10/11 x64**，当前未做代码签名，不附共享账号或模型额度；Git、Python、编译器等项目专用工具仍可能需要另行准备。
+
+**源码开发者：**
+
+当前桌面界面以中文为主，入门卡片和使用文档附有英文指引。
+
 **准备环境**
 
 - Windows，Node.js **24 或更新版本**，以及 npm。
 - 已安装 Codex CLI，并使用 ChatGPT 登录。
-- 已安装 Claude Code，配置好 DeepSeek，供实现任务使用。
+- 可选：Claude Code 和 DeepSeek 配置；未配置时由 GPT 实现任务。
 - 可选：Ollama 和本地 Qwen 模型，用于只读辅助任务。
 - 导入仓库需要 Git；GitHub 账号登录和私有仓库访问需要 GitHub CLI。
 
 在项目目录执行：
 
 ```powershell
+git clone https://github.com/zhangsiyu1266/agent-studio.git
+cd agent-studio
 npm ci
 npm start
 ```
@@ -310,10 +339,13 @@ node scripts/file-access-smoke.cjs
 
 ```powershell
 powershell -File scripts/prepare-github.ps1
+powershell -File scripts/prepare-runtime.ps1
 npm run package
+npm run release:smoke
+npm run release:archive
 ```
 
-准备脚本下载固定版本的 GitHub CLI **2.102.0**，并校验官方发布的 SHA-256。便携版附带 CLI 及其许可证。启动 `dist/Agent-Studio/Agent Studio.exe`，请整体保留 `Agent-Studio` 文件夹。依赖、验收数据和便携构建产物不纳入源码仓库。
+准备脚本分别验证 GitHub CLI **2.102.0** 的 SHA-256、Node.js **24.21.0** 的官方校验值和 Codex **0.160.0** 的 npm SHA-512 完整性，并保留许可证和上游运行资源。打包会新建 `dist/Agent-Studio-0.2.0-win-x64`，不会静默复用旧目录。干净配置冒烟验收隐藏本机已有工具和凭据，不启动 OAuth 或模型推理；归档命令生成 ZIP 与 `SHA256SUMS.txt`。依赖、验收数据和构建产物不纳入源码仓库。
 
 | 目录 | 用途 |
 |---|---|
@@ -326,4 +358,4 @@ npm run package
 
 贡献前请阅读 [AGENTS.md](AGENTS.md) 和 [docs/ENGINEERING.md](docs/ENGINEERING.md)。报告问题时请提供复现步骤和脱敏后的错误信息，不要上传凭据或不打算公开的私有源码。
 
-**许可证：** 项目尚未声明许可证。公开可见不等于获得开源许可；随包分发的第三方组件保留各自许可证。
+**许可证：** [MIT](LICENSE)。随包分发的第三方组件保留各自许可证，详见[第三方声明](THIRD-PARTY-NOTICES.md)。

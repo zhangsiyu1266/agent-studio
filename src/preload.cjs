@@ -5,6 +5,9 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 contextBridge.exposeInMainWorld('studio', {
   getState: () => ipcRenderer.invoke('studio:state'),
   probe: () => ipcRenderer.invoke('studio:probe'),
+  setupLogin: () => ipcRenderer.invoke('studio:setup-login'),
+  setupCancel: () => ipcRenderer.invoke('studio:setup-cancel'),
+  setupHelp: (topic) => ipcRenderer.invoke('studio:setup-help', topic),
   chooseProject: () => ipcRenderer.invoke('studio:choose-project'),
   selectProject: (target) => ipcRenderer.invoke('studio:projects-select', target),
   forgetProject: (target) => ipcRenderer.invoke('studio:projects-forget', target),

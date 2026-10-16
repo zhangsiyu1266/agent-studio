@@ -1,6 +1,7 @@
 {
   "name": "agent-studio",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "license": "MIT",
   "private": true,
   "description": "GPT-led local multi-agent desktop workspace",
   "main": "src/main.cjs",
@@ -9,7 +10,9 @@
     "test": "node --test tests/*.test.cjs",
     "check": "node scripts/check.cjs",
     "smoke": "node scripts/smoke.cjs",
-    "package": "node scripts/package.cjs"
+    "package": "node scripts/package.cjs",
+    "release:archive": "node scripts/release.cjs",
+    "release:smoke": "node scripts/release-smoke.cjs"
   },
   "devDependencies": {
     "electron": "^42.0.0"

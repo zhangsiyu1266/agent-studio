@@ -3,6 +3,7 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { bundledNode } = require('./runtime.cjs');
 
 class ProcessAbortError extends Error {
   constructor(message = 'Process aborted') {
@@ -62,6 +63,7 @@ function resolveCommand(command) {
 
 function findNodeRuntime() {
   if (!process.versions.electron) return process.execPath;
+  if (fs.existsSync(bundledNode())) return bundledNode();
   for (const directory of (process.env.PATH || '').split(path.delimiter)) {
     const candidate = path.join(directory, process.platform === 'win32' ? 'node.exe' : 'node');
     if (directory && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
@@ -78,6 +80,8 @@ function findNodeRuntime() {
  */
 function findNodeCli(scriptName) {
   const candidates = [];
+
+  if (process.versions.electron) candidates.push(path.join(path.dirname(bundledNode()), 'node_modules', 'npm', 'bin', scriptName));
 
   if (process.env.npm_execpath && path.basename(process.env.npm_execpath) === scriptName) {
     candidates.push(process.env.npm_execpath);
