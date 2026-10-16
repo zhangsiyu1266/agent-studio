@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.build/
+.agent-studio/
+*.log
+coverage/
+tools/github/
+
+# Local credentials and machine-specific provider configuration.
+.env
+.env.*
+!.env.example
+!.env.sample
+.codex/
+.claude/
+.aws/
+*.pem
+*.key

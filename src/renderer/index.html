@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:;">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Studio</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <rect x="3" y="3" width="11" height="11" rx="3" fill="#7ee2b8"></rect>
+          <rect x="18" y="3" width="11" height="11" rx="3" fill="#c4b5fd"></rect>
+          <rect x="3" y="18" width="11" height="11" rx="3" fill="#c4b5fd"></rect>
+          <rect x="18" y="18" width="11" height="11" rx="3" fill="#7ee2b8"></rect>
+        </svg>
+        <div class="brand-text">
+          <h1 class="brand-title">Agent Studio</h1>
+          <p class="brand-subtitle">多模型协作工作台</p>
+        </div>
+      </div>
+
+      <nav class="nav" id="main-nav" role="navigation" aria-label="页面导航">
+        <button class="nav-item active" type="button" data-view="workbench" aria-current="page">
+          <span class="nav-icon" aria-hidden="true">▦</span><span>工作台</span>
+        </button>
+        <button class="nav-item" type="button" data-view="runs">
+          <span class="nav-icon" aria-hidden="true">≡</span><span>执行记录</span>
+        </button>
+        <button class="nav-item" type="button" data-view="completed">
+          <span class="nav-icon" aria-hidden="true">✓</span><span>完成任务</span><span id="completed-count" class="nav-count">0</span>
+        </button>
+        <button class="nav-item" type="button" data-view="connections">
+          <span class="nav-icon" aria-hidden="true">⇄</span><span>模型连接</span>
+        </button>
+        <button class="nav-item" type="button" data-view="standards">
+          <span class="nav-icon" aria-hidden="true">¶</span><span>工程规范</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="connection-mini">
+          <span class="status-dot" id="sidebar-status-dot" aria-hidden="true"></span>
+          <span id="sidebar-status-text">正在检测连接…</span>
+        </div>
+        <p class="sidebar-hint">桌面运行 · 记录保存在本机</p>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <div class="topbar-heading">
+          <h2 id="topbar-title">工作台</h2>
+          <p id="topbar-subtitle">选择项目并描述需求，启动多模型协作</p>
+        </div>
+        <div class="topbar-actions" id="topbar-actions"></div>
+      </header>
+
+      <div class="view-container">
+        <section id="view-workbench" class="view" role="tabpanel" aria-label="工作台"></section>
+        <section id="view-runs" class="view hidden" role="tabpanel" aria-label="执行记录"></section>
+        <section id="view-completed" class="view hidden" role="tabpanel" aria-label="完成任务"></section>
+        <section id="view-connections" class="view hidden" role="tabpanel" aria-label="模型连接"></section>
+        <section id="view-standards" class="view hidden" role="tabpanel" aria-label="工程规范"></section>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="false"></div>
+
+  <script src="progress.js"></script>
+  <script src="project-picker.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
